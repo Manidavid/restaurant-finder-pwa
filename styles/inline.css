@@ -297,6 +297,12 @@ body {
   .weather-forecast .current .pcount:before {
     content: "Pollen ";
     color: #888; }
+  .weather-forecast .current .open_now:before {
+    content: "Opened: ";
+    color: #888; }
+  .weather-forecast .current .rating:before {
+    content: "Rating: ";
+    color: #888; }
 
 .weather-forecast .future {
   display: -webkit-box;

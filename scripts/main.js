@@ -83,71 +83,80 @@
 
   // Updates a weather card with the latest weather forecast. If the card
   // doesn't already exist, it's cloned from the template.
+  var initialWeatherForecast = {
+    formatted_address: "80 Feet Road, Next to Bsnl, HAL 2nd Stage, Indiranagar, Bengaluru, Karnataka 560008, India",
+    geometry: {
+      location: {
+        lat: 12.969969,
+        lng: 77.64740599999999
+      },
+    },
+    id: "10d18bd052d68c9d238dc9c82318dccb1699a744",
+    name: "Empire Restaurant",
+    opening_hours: {
+      open_now: false,
+      weekday_text: []
+    },
+    photos: [
+      {
+        height: 1365,
+        html_attributions: [
+          "<a href=\"https://maps.google.com/maps/contrib/108098098762277434559/photos\">Empire Restaurant</a>"
+        ],
+        photo_reference: "CmRaAAAAbI7uhFCiGzO3RKqQ873FMS9bhRxdGagCtiEfzvrpd8QNJB4hqk-f9J-gH8Ai4gKppsp2kxQZOAp2xn-ng3WTI2e-JjXCsgk5UWYKXZUNdZ93NZf5j2faOTUHvYjAoUZNEhADnv_yjbbvGzCQHHV4zjhIGhSR1-s8ay312LVwSN9gyOSgwCVVKQ",
+        width: 2048
+      }
+    ],
+    place_id: "ChIJtwapWjeuEmsRcxV5JARHpSk",
+    rating: 4.2,
+  };
+  
   app.updateForecastCard = function(data) {
-    var dataLastUpdated = new Date(data.created);
-    var sunrise = data.channel.astronomy.sunrise;
-    var sunset = data.channel.astronomy.sunset;
-    var current = data.channel.item.condition;
-    var humidity = data.channel.atmosphere.humidity;
-    var wind = data.channel.wind;
-
-    var card = app.visibleCards[data.key];
+    //console.log(data);
+    var card = app.visibleCards[data.id];
     if (!card) {
       card = app.cardTemplate.cloneNode(true);
       card.classList.remove('cardTemplate');
-      card.querySelector('.location').textContent = data.label;
+      card.querySelector('.location').textContent = data.name;
       card.removeAttribute('hidden');
       app.container.appendChild(card);
       app.visibleCards[data.key] = card;
     }
+    //console.log(app.visibleCards);
 
-    // Verifies the data provide is newer than what's already visible
-    // on the card, if it's not bail, if it is, continue and update the
-    // time saved in the card
-    var cardLastUpdatedElem = card.querySelector('.card-last-updated');
-    var cardLastUpdated = cardLastUpdatedElem.textContent;
-    if (cardLastUpdated) {
-      cardLastUpdated = new Date(cardLastUpdated);
-      // Bail if the card has more recent data then the data
-      if (dataLastUpdated.getTime() < cardLastUpdated.getTime()) {
-        return;
-      }
-    }
-    cardLastUpdatedElem.textContent = data.created;
-
-    card.querySelector('.description').textContent = current.text;
-    card.querySelector('.date').textContent = current.date;
-    card.querySelector('.current .icon').classList.add(app.getIconClass(current.code));
-    card.querySelector('.current .temperature .value').textContent =
-      Math.round(current.temp);
-    card.querySelector('.current .sunrise').textContent = sunrise;
-    card.querySelector('.current .sunset').textContent = sunset;
-    card.querySelector('.current .humidity').textContent =
-      Math.round(humidity) + '%';
-    card.querySelector('.current .wind .value').textContent =
-      Math.round(wind.speed);
-    card.querySelector('.current .wind .direction').textContent = wind.direction;
-    var nextDays = card.querySelectorAll('.future .oneday');
-    var today = new Date();
-    today = today.getDay();
-    for (var i = 0; i < 7; i++) {
-      var nextDay = nextDays[i];
-      var daily = data.channel.item.forecast[i];
-      if (daily && nextDay) {
-        nextDay.querySelector('.date').textContent =
-          app.daysOfWeek[(i + today) % 7];
-        nextDay.querySelector('.icon').classList.add(app.getIconClass(daily.code));
-        nextDay.querySelector('.temp-high .value').textContent =
-          Math.round(daily.high);
-        nextDay.querySelector('.temp-low .value').textContent =
-          Math.round(daily.low);
-      }
-    }
+    card.querySelector('.description').textContent = data.formatted_address;
+    card.querySelector('.current .icon').classList.add(app.getIconClass(data.photos[0].photo_reference));
+    card.querySelector('.current .open_now').textContent = data.opening_hours.open_now ? 'Yes' : 'No';
+    card.querySelector('.current .rating').textContent = data.rating;
     if (app.isLoading) {
       app.spinner.setAttribute('hidden', true);
       app.container.removeAttribute('hidden');
       app.isLoading = false;
     }
+  };
+
+  app.getIconClass = function(photo_ref) {
+    console.log('getIconClass'+'---'+photo_ref);
+    var url = 'https://maps.googleapis.com/maps/api/place/photo?key=AIzaSyDtdrUh1sArC2fiKX_iYzx8BwHMmiNmy7M&maxwidth=400&photoreference='+photo_ref;
+    // Fetch the latest data.
+    console.log(url);
+    var request = new XMLHttpRequest();
+    request.onreadystatechange = function() {
+      if (request.readyState === XMLHttpRequest.DONE) {
+        if (request.status === 200) {
+          var response = JSON.parse(request.response);
+          var results = response.query.results;
+          results.key = key;
+          results.label = label;
+          results.created = response.query.created;
+          console.log(results);
+          console.log(response);
+
+        }
+      }
+    };
+    request.open('GET', url);
+    request.send();
   };
 
 
@@ -219,117 +228,19 @@
 
   // TODO add saveSelectedCities function here
   // Save list of cities to localStorage.
-  app.saveSelectedCities = function() {
-    var selectedCities = JSON.stringify(app.selectedCities);
-    localStorage.selectedCities = selectedCities;
-  };
-
-  app.getIconClass = function(weatherCode) {
-    // Weather codes: https://developer.yahoo.com/weather/documentation.html#codes
-    weatherCode = parseInt(weatherCode);
-    switch (weatherCode) {
-      case 25: // cold
-      case 32: // sunny
-      case 33: // fair (night)
-      case 34: // fair (day)
-      case 36: // hot
-      case 3200: // not available
-        return 'clear-day';
-      case 0: // tornado
-      case 1: // tropical storm
-      case 2: // hurricane
-      case 6: // mixed rain and sleet
-      case 8: // freezing drizzle
-      case 9: // drizzle
-      case 10: // freezing rain
-      case 11: // showers
-      case 12: // showers
-      case 17: // hail
-      case 35: // mixed rain and hail
-      case 40: // scattered showers
-        return 'rain';
-      case 3: // severe thunderstorms
-      case 4: // thunderstorms
-      case 37: // isolated thunderstorms
-      case 38: // scattered thunderstorms
-      case 39: // scattered thunderstorms (not a typo)
-      case 45: // thundershowers
-      case 47: // isolated thundershowers
-        return 'thunderstorms';
-      case 5: // mixed rain and snow
-      case 7: // mixed snow and sleet
-      case 13: // snow flurries
-      case 14: // light snow showers
-      case 16: // snow
-      case 18: // sleet
-      case 41: // heavy snow
-      case 42: // scattered snow showers
-      case 43: // heavy snow
-      case 46: // snow showers
-        return 'snow';
-      case 15: // blowing snow
-      case 19: // dust
-      case 20: // foggy
-      case 21: // haze
-      case 22: // smoky
-        return 'fog';
-      case 24: // windy
-      case 23: // blustery
-        return 'windy';
-      case 26: // cloudy
-      case 27: // mostly cloudy (night)
-      case 28: // mostly cloudy (day)
-      case 31: // clear (night)
-        return 'cloudy';
-      case 29: // partly cloudy (night)
-      case 30: // partly cloudy (day)
-      case 44: // partly cloudy
-        return 'partly-cloudy-day';
-    }
-  };
+  // app.saveSelectedCities = function() {
+  //   var selectedCities = JSON.stringify(app.selectedCities);
+  //   localStorage.selectedCities = selectedCities;
+  // };
 
   /*
    * Fake weather data that is presented when the user first uses the app,
    * or when the user has not saved any cities. See startup code for more
    * discussion.
    */
-  var initialWeatherForecast = {
-    key: '2459115',
-    label: 'New York, NY',
-    created: '2016-07-22T01:00:00Z',
-    channel: {
-      astronomy: {
-        sunrise: "5:43 am",
-        sunset: "8:21 pm"
-      },
-      item: {
-        condition: {
-          text: "Windy",
-          date: "Thu, 21 Jul 2016 09:00 PM EDT",
-          temp: 56,
-          code: 24
-        },
-        forecast: [
-          {code: 44, high: 86, low: 70},
-          {code: 44, high: 94, low: 73},
-          {code: 4, high: 95, low: 78},
-          {code: 24, high: 75, low: 89},
-          {code: 24, high: 89, low: 77},
-          {code: 44, high: 92, low: 79},
-          {code: 44, high: 89, low: 77}
-        ]
-      },
-      atmosphere: {
-        humidity: 56
-      },
-      wind: {
-        speed: 25,
-        direction: 195
-      }
-    }
-  };
+  
   // TODO uncomment line below to test app with fake data
-  // app.updateForecastCard(initialWeatherForecast);
+  app.updateForecastCard(initialWeatherForecast);
 
   /************************************************************************
    *
@@ -343,29 +254,29 @@
    ************************************************************************/
 
   // TODO add startup code here
-  app.selectedCities = localStorage.selectedCities;
-  if (app.selectedCities) {
-    app.selectedCities = JSON.parse(app.selectedCities);
-    app.selectedCities.forEach(function(city) {
-      app.getForecast(city.key, city.label);
-    });
-  } else {
+  // app.selectedCities = localStorage.selectedCities;
+  // if (app.selectedCities) {
+  //   app.selectedCities = JSON.parse(app.selectedCities);
+  //   app.selectedCities.forEach(function(city) {
+  //     app.getForecast(city.key, city.label);
+  //   });
+  // } else {
     /* The user is using the app for the first time, or the user has not
      * saved any cities, so show the user some fake data. A real app in this
      * scenario could guess the user's location via IP lookup and then inject
      * that data into the page.
      */
-    app.updateForecastCard(initialWeatherForecast);
-    app.selectedCities = [
-      {key: initialWeatherForecast.key, label: initialWeatherForecast.label}
-    ];
-    app.saveSelectedCities();
-  }
+  //   app.updateForecastCard(initialWeatherForecast);
+  //   app.selectedCities = [
+  //     {key: initialWeatherForecast.key, label: initialWeatherForecast.label}
+  //   ];
+  //   app.saveSelectedCities();
+  // }
 
   // service worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js').then(function() { 
-      console.log('Service Worker Registered');
-    });
-  }
+  // if ('serviceWorker' in navigator) {
+  //   navigator.serviceWorker.register('./service-worker.js').then(function() { 
+  //     console.log('Service Worker Registered');
+  //   });
+  // }
 })();
